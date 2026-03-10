@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="local/plugininstalltimer/db" VERSION="20260216" COMMENT="XMLDB file for local_plugininstalltimer">
+  <TABLES>
+    <TABLE NAME="local_plugin_install_dates" COMMENT="Suivi des installations">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" UNSIGNED="true" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="pluginname" TYPE="char" LENGTH="255" NOTNULL="true"/>
+        <FIELD NAME="timeinstalled" TYPE="int" LENGTH="10" UNSIGNED="true" NOTNULL="true"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" UNSIGNED="true" NOTNULL="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" UNSIGNED="true" NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="pluginname" UNIQUE="true" FIELDS="pluginname"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>
