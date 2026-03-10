@@ -31,7 +31,7 @@ function xmldb_local_plugininstalltimer_upgrade($oldversion) {
     $dbman = $DB->get_manager();
 
     if ($oldversion < 2026021602) {
-        $table = new xmldb_table('local_plugin_install_dates');
+        $table = new xmldb_table('local_plugininstalltimer');
 
         $field = new xmldb_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'timeinstalled');
         if (!$dbman->field_exists($table, $field)) {
@@ -47,4 +47,5 @@ function xmldb_local_plugininstalltimer_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026021602, 'local', 'plugininstalltimer');
     }
     return true;
+
 }
