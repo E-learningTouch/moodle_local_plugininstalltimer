@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <XMLDB PATH="local/plugininstalltimer/db" VERSION="20260216" COMMENT="XMLDB file for local_plugininstalltimer">
   <TABLES>
-    <TABLE NAME="local_plugin_install_dates" COMMENT="Suivi des installations">
+    <TABLE NAME="local_plugininstalltimer" COMMENT="Plugin Installations Monitoring">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" UNSIGNED="true" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="pluginname" TYPE="char" LENGTH="255" NOTNULL="true"/>
