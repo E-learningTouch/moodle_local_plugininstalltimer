@@ -24,6 +24,7 @@
  * @copyright   2026 E-learning Touch' <contact@elearningtouch.com> (Maintainer)
  * @license     https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+
 namespace local_plugininstalltimer;
 
 defined('MOODLE_INTERNAL') || die();
@@ -83,7 +84,7 @@ class callbacks {
 
                     Templates.render('local_plugininstalltimer/columns', { isheader: true }).then(function(html) {
                         t.find('thead tr').append(html);
-                        
+
                         t.find('.js-timer-header').on('click', function() {
                             var type = $(this).data('type'), tbody = t.find('tbody'), rows = tbody.find('tr').get();
                             var asc = $(this).toggleClass('asc').hasClass('asc');
@@ -140,25 +141,77 @@ class callbacks {
             foreach ($list as $name => $plugininfo) {
                 $comp = $type . '_' . $name;
                 $path = $plugininfo->rootdir;
-                $fdate = ($path && file_exists($path)) ? filemtime($path) : time();
+
+                $mtime = ($path && file_exists($path)) ? filemtime($path) : time();
+                $ctime = ($path && file_exists($path)) ? filectime($path) : time();
+                $fdate = max($mtime, $ctime); 
+
+                $log_data = self::get_real_installer_data($comp);
 
                 if ($rec = $DB->get_record('local_plugin_install_dates', ['pluginname' => $comp])) {
-                    if ($fdate > $rec->timemodified) {
+                    $updated = false;
+
+                    if ($log_data && $log_data->time > $rec->timemodified) {
+                        $rec->timemodified = $log_data->time;
+                        $rec->userid = $log_data->userid;
+                        $updated = true;
+                    } 
+                    else if ($fdate > $rec->timemodified) {
                         $rec->timemodified = $fdate;
-                        $rec->userid = $USER->id; 
+                        $rec->userid = ($fdate > (time() - 86400)) ? $USER->id : 0;
+                        $updated = true;
+                    }
+
+                    if ($rec->userid == 0 && $log_data && $log_data->userid != 0) {
+                        $rec->userid = $log_data->userid;
+                        $updated = true;
+                    }
+
+                    if ($updated) {
                         $DB->update_record('local_plugin_install_dates', $rec);
                     }
                 } else {
+                    $time = ($log_data) ? $log_data->time : $fdate;
+                    
+                    if ($log_data && $log_data->userid != 0) {
+                        $userid = $log_data->userid;
+                    } else {
+                        $userid = ($fdate > (time() - 86400)) ? $USER->id : 0;
+                    }
+
                     $new = (object)[
                         'pluginname' => $comp, 
-                        'timeinstalled' => $fdate, 
-                        'timemodified' => $fdate, 
-                        'userid' => $USER->id
+                        'timeinstalled' => $time, 
+                        'timemodified' => $time, 
+                        'userid' => $userid
                     ];
                     $DB->insert_record('local_plugin_install_dates', $new);
                 }
             }
         }
     }
-}
 
+    private static function get_real_installer_data(string $pluginname): ?object {
+        global $DB;
+        
+        try {
+            $sql = "SELECT userid, timemodified FROM {upgrade_log} WHERE plugin = ? ORDER BY timemodified DESC";
+            $logs = $DB->get_records_sql($sql, [$pluginname], 0, 1);
+            if (!empty($logs)) {
+                $log = reset($logs);
+                return (object)['userid' => (int)$log->userid, 'time' => (int)$log->timemodified];
+            }
+        } catch (\Exception $e) {}
+        
+        try {
+            $sql = "SELECT userid, timemodified FROM {config_log} WHERE plugin = ? AND name = 'version' ORDER BY timemodified DESC";
+            $logs = $DB->get_records_sql($sql, [$pluginname], 0, 1);
+            if (!empty($logs)) {
+                $log = reset($logs);
+                return (object)['userid' => (int)$log->userid, 'time' => (int)$log->timemodified];
+            }
+        } catch (\Exception $e) {}
+
+        return null;
+    }
+}
