@@ -1,0 +1,42 @@
+name: Moodle Plugin CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        moodle-branch: ['MOODLE_404_STABLE', 'MOODLE_405_STABLE', 'MOODLE_500_STABLE', 'MOODLE_501_STABLE']
+        php-version: ['8.1', '8.2', '8.3']
+        database: ['mysqli', 'pgsql']
+
+    steps:
+    - name: Check out plugin code
+      uses: actions/checkout@v4
+      with:
+        path: plugin
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php-version }}
+        extensions: mysqli, pgsql, gd, intl, xmlrpc, soap, zip
+
+    - name: Install moodle-plugin-ci
+      run: |
+        composer create-project -n --no-dev --prefer-dist moodlehq/moodle-plugin-ci ci ^4.0
+        echo "$(cd ci/bin; pwd)" >> $GITHUB_PATH
+        echo "$(cd ci/vendor/bin; pwd)" >> $GITHUB_PATH
+
+    - name: Install Moodle
+      run: moodle-plugin-ci install --plugin ./plugin --db-engine=${{ matrix.database }} --moodle=${{ matrix.moodle-branch }}
+
+    - name: Run PHPUnit tests
+      run: moodle-plugin-ci phpunit
