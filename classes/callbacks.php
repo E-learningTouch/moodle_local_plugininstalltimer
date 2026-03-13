@@ -80,7 +80,12 @@ class callbacks {
                 
                 var run = function() {
                     var t = $('.admintable, #plugins-control-panel').last();
-                    if (!t.length || t.find('.js-timer-header').length) return;
+                    
+                    // ANTI-DOUBLON ABSOLU : On vérifie si on a déjà posé notre verrou
+                    if (!t.length || t.hasClass('plugin-timer-loaded')) return;
+                    
+                    // On pose le verrou IMMÉDIATEMENT (synchrone) avant que Mustache ne commence
+                    t.addClass('plugin-timer-loaded');
 
                     Templates.render('local_plugininstalltimer/columns', { isheader: true }).then(function(html) {
                         t.find('thead tr').append(html);
@@ -105,23 +110,21 @@ class callbacks {
                         var r = $(this), txt = r.text();
                         var m = d.find(item => txt.indexOf(item.n) !== -1);
                         
-                        if (!r.find('.c-si').length) {
-                            var context = { iscell: true };
-                            if (m) {
-                                context.found = true;
-                                context.si = m.si;
-                                context.di = m.di;
-                                context.sm = m.sm;
-                                context.dm = m.dm;
-                                context.u = m.u;
-                            } else {
-                                context.found = false;
-                            }
-
-                            Templates.render('local_plugininstalltimer/columns', context).then(function(html) {
-                                r.append(html);
-                            });
+                        var context = { iscell: true };
+                        if (m) {
+                            context.found = true;
+                            context.si = m.si;
+                            context.di = m.di;
+                            context.sm = m.sm;
+                            context.dm = m.dm;
+                            context.u = m.u;
+                        } else {
+                            context.found = false;
                         }
+
+                        Templates.render('local_plugininstalltimer/columns', context).then(function(html) {
+                            r.append(html);
+                        });
                     });
                 };
                 
@@ -141,7 +144,7 @@ class callbacks {
             foreach ($list as $name => $plugininfo) {
                 $comp = $type . '_' . $name;
                 $path = $plugininfo->rootdir;
-
+                
                 $mtime = ($path && file_exists($path)) ? filemtime($path) : time();
                 $ctime = ($path && file_exists($path)) ? filectime($path) : time();
                 $fdate = max($mtime, $ctime); 
@@ -174,7 +177,7 @@ class callbacks {
                     $time = ($log_data) ? $log_data->time : $fdate;
                     
                     if ($log_data && $log_data->userid != 0) {
-                        $userid = $log_data->userid;
+                        $userid = $log_data->userid; 
                     } else {
                         $userid = ($fdate > (time() - 86400)) ? $USER->id : 0;
                     }
@@ -201,8 +204,8 @@ class callbacks {
                 $log = reset($logs);
                 return (object)['userid' => (int)$log->userid, 'time' => (int)$log->timemodified];
             }
-        } catch (\Exception $e) {}
-        
+        } catch (\Exception $e) {} 
+
         try {
             $sql = "SELECT userid, timemodified FROM {config_log} WHERE plugin = ? AND name = 'version' ORDER BY timemodified DESC";
             $logs = $DB->get_records_sql($sql, [$pluginname], 0, 1);
@@ -215,5 +218,3 @@ class callbacks {
         return null;
     }
 }
-
-
