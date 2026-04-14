@@ -33,6 +33,17 @@ $string['installedby'] = 'By';
 $string['unknown'] = 'System';
 $string['plugininstalltimer:view'] = 'View install dates';
 
+$string['updateavailable'] = 'Update Available';
+$string['filter_updates'] = 'Filter: Updates available';
+$string['filter_all'] = 'Show all plugins';
+$string['export_add_csv'] = 'Export additional plugins list (CSV)';
+$string['export_maj_csv'] = 'Export additional updates list (CSV)';
+$string['alert_no_add'] = 'No additional plugins found on this site.';
+$string['alert_no_maj'] = 'No updates available for your additional plugins.';
+$string['yes'] = 'Yes';
+$string['no'] = 'No';
+$string['csv_plugin'] = 'Plugin';
+
 // GDPR
 $string['privacy:metadata:tabledescription'] = 'Stores plugin dates.';
 $string['privacy:metadata:pluginname'] = 'Plugin name';

@@ -27,6 +27,9 @@
 }}
 
 {{#isheader}}
+    <th class="header js-timer-header" style="cursor:pointer;color:#007bff" data-type="up">
+        {{#str}} updateavailable, local_plugininstalltimer {{/str}} <i class="fa fa-sort"></i>
+    </th>
     <th class="header js-timer-header" style="cursor:pointer;color:#007bff" data-type="si">
         {{#str}} installdate, local_plugininstalltimer {{/str}} <i class="fa fa-sort"></i>
     </th>
@@ -40,12 +43,17 @@
 
 {{#iscell}}
     {{#found}}
+        <td class="c-up" data-v="{{sortup}}">
+            {{#hasupdate}}<span class="badge badge-warning bg-warning text-dark">{{#str}} yes, local_plugininstalltimer {{/str}}</span>{{/hasupdate}}
+            {{^hasupdate}}-{{/hasupdate}}
+        </td>
         <td class="c-si" data-v="{{si}}">{{di}}</td>
         <td class="c-sm" data-v="{{sm}}">{{dm}}</td>
         <td>{{u}}</td>
     {{/found}}
     
     {{^found}}
+        <td class="c-up" data-v="0">-</td>
         <td class="c-si" data-v="0">-</td>
         <td class="c-sm" data-v="0">-</td>
         <td>-</td>
