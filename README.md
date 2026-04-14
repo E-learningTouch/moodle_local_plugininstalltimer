@@ -19,6 +19,9 @@ By default, Moodle does not display when a plugin was installed or updated. This
 * **User Tracking:** Records the User ID of the person who triggered the installation or update.
 * **Sortable Columns:** You can sort plugins by installation date to easily see what changed recently.
 * **GDPR Compliant:** Includes Privacy API implementation.
+* **Update Detection:** New column indicating if a plugin has an update available.
+* **CSV Export:** Buttons to generate Excel-compatible CSV reports.
+* **Quick Filter**
 
 ### Installation
 1.  Download the `.zip` file.
