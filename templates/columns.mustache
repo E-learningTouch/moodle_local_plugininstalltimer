@@ -44,11 +44,18 @@
 {{#iscell}}
     {{#found}}
         <td class="c-up" data-v="{{sortup}}">
-            {{#hasupdate}}<span class="badge badge-warning bg-warning text-dark">{{#str}} yes, local_plugininstalltimer {{/str}}</span>{{/hasupdate}}
+            {{#hasupdate}}<span class="badge bg-warning text-dark">{{#str}} yes, local_plugininstalltimer {{/str}}</span>{{/hasupdate}}
             {{^hasupdate}}-{{/hasupdate}}
         </td>
         <td class="c-si" data-v="{{si}}">{{di}}</td>
-        <td class="c-sm" data-v="{{sm}}">{{dm}}</td>
+        <td class="c-sm" data-v="{{sm}}">
+            {{dm}}
+            {{#updatecount}}
+                <span class="badge rounded-pill bg-info text-white ms-1" title="{{#str}} totalupdates, local_plugininstalltimer {{/str}}">
+                    {{updatecount}}
+                </span>
+            {{/updatecount}}
+        </td>
         <td>{{u}}</td>
     {{/found}}
     

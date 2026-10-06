@@ -30,22 +30,30 @@ function xmldb_local_plugininstalltimer_upgrade($oldversion) {
     global $DB;
     $dbman = $DB->get_manager();
 
-    if ($oldversion < 2026021602) {
+    if ($oldversion < 2026100500) {
+        // 1. Ajouter le champ version à la table principale
         $table = new xmldb_table('local_plugininstalltimer');
+        $field = new xmldb_field('version', XMLDB_TYPE_CHAR, '30', null, null, null, null, 'pluginname');
 
-        $field = new xmldb_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'timeinstalled');
-        if (!$dbman->field_exists($table, $field)) {
-            $dbman->add_field($table, $field);
-            $DB->execute("UPDATE {local_plugin_install_dates} SET timemodified = timeinstalled");
-        }
-
-        $field = new xmldb_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'timemodified');
         if (!$dbman->field_exists($table, $field)) {
             $dbman->add_field($table, $field);
         }
 
-        upgrade_plugin_savepoint(true, 2026021602, 'local', 'plugininstalltimer');
+        // 2. Créer la nouvelle table d'historique
+        $histtable = new xmldb_table('local_plugininstalltimer_hist');
+        $histtable->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $histtable->add_field('pluginname', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, null);
+        $histtable->add_field('version', XMLDB_TYPE_CHAR, '30', null, null, null, null);
+        $histtable->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, 0);
+        $histtable->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        
+        $histtable->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+
+        if (!$dbman->table_exists($histtable)) {
+            $dbman->create_table($histtable);
+        }
+
+        upgrade_plugin_savepoint(true, 2026100500, 'local', 'plugininstalltimer');
     }
     return true;
-
 }

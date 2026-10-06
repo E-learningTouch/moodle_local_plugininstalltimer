@@ -49,10 +49,29 @@ class callbacks {
             try { $records = $DB->get_records_sql($sql); } catch (\Exception $e) { return; }
             
             $pluginman = \core_plugin_manager::instance();
+            
+            // --- NOUVEAU CODE : Récupération optimisée de l'historique ---
+            $sqlhist = "SELECT pluginname, COUNT(id) as total FROM {local_plugininstalltimer_hist} GROUP BY pluginname";
+            $history_counts = [];
+            try {
+                if ($hist_records = $DB->get_records_sql($sqlhist)) {
+                    foreach ($hist_records as $hr) {
+                        $history_counts[$hr->pluginname] = (int)$hr->total;
+                    }
+                }
+            } catch (\Exception $e) { 
+            }
+            // -------------------------------------------------------------
+            
             $data = [];
             foreach ($records as $record) {
                 $fullname = (!empty($record->firstname)) ? fullname($record) : get_string('unknown', 'local_plugininstalltimer');
                 $plugininfo = $pluginman->get_plugin_info($record->pluginname);
+                
+                // --- NOUVEAU CODE : Calcul du badge ---
+                $raw_count = isset($history_counts[$record->pluginname]) ? $history_counts[$record->pluginname] : 0;
+                $update_count = max(0, $raw_count - 1); 
+                // --------------------------------------
                 
                 $data[] = [
                     'n' => (string)$record->pluginname,
@@ -62,11 +81,37 @@ class callbacks {
                     'si' => (int)$record->timeinstalled,
                     'sm' => (int)$record->timemodified,
                     'up' => ($plugininfo && !empty($plugininfo->available_updates())) ? 1 : 0,
-                    'add' => ($plugininfo && !$plugininfo->is_standard()) ? 1 : 0
+                    'add' => ($plugininfo && !$plugininfo->is_standard()) ? 1 : 0,
+                    'uc' => $update_count > 0 ? $update_count : false
                 ];
             }
 
             $jsdata = json_encode(array_values($data));
+            
+            // --- CORRECTION : Ajout des champs de nommage manquants pour fullname() ---
+            $sql_hist_export = "SELECT h.id, h.pluginname, h.version, h.timemodified, 
+                                       u.firstname, u.lastname, u.email, 
+                                       u.middlename, u.alternatename, u.firstnamephonetic, u.lastnamephonetic
+                                FROM {local_plugininstalltimer_hist} h
+                                LEFT JOIN {user} u ON u.id = h.userid
+                                ORDER BY h.timemodified DESC";
+            $hist_data = [];
+            try {
+                if ($hist_records = $DB->get_records_sql($sql_hist_export)) {
+                    foreach ($hist_records as $hr) {
+                        $hist_data[] = [
+                            'p' => (string)$hr->pluginname,
+                            'v' => (string)$hr->version,
+                            'd' => userdate($hr->timemodified, get_string('strftimedatetimeshort', 'langconfig')),
+                            'u' => (!empty($hr->firstname)) ? fullname($hr) : get_string('unknown', 'local_plugininstalltimer'),
+                            'e' => (string)$hr->email // Courriel
+                        ];
+                    }
+                }
+            } catch (\Exception $e) {}
+            
+            $jshistdata = json_encode(array_values($hist_data));
+            // --------------------------------------------------------------------------
             
             // On prépare toutes les traductions pour le JavaScript
             $langstrs = [
@@ -83,12 +128,20 @@ class callbacks {
                 'updatedate' => get_string('updatedate', 'local_plugininstalltimer'),
                 'installedby' => get_string('installedby', 'local_plugininstalltimer'),
                 'updateavailable' => get_string('updateavailable', 'local_plugininstalltimer'),
+                'export_hist_csv' => get_string('export_hist_csv', 'local_plugininstalltimer'),
+                'email' => get_string('email', 'local_plugininstalltimer'),
+                'version' => get_string('version', 'core_plugin'),
+                'alert_empty_hist' => get_string('alert_empty_hist', 'local_plugininstalltimer'),
+                'console_click_export' => get_string('console_click_export', 'local_plugininstalltimer'),
+                'error_csv_generation' => get_string('error_csv_generation', 'local_plugininstalltimer'),
+                'alert_csv_error' => get_string('alert_csv_error', 'local_plugininstalltimer'),
             ];
             $jslang = json_encode($langstrs);
             
             $script = "
             require(['jquery', 'core/templates'], function($, Templates) {
                 var d = {$jsdata};
+                var hd = {$jshistdata};
                 var lang = {$jslang}; // Récupération des traductions dynamiques
                 
                 var run = function() {
@@ -100,8 +153,9 @@ class callbacks {
                     var btnFilter = $('<button class=\"btn btn-primary\">' + lang.filter_updates + '</button>');
                     var btnCsvAll = $('<button class=\"btn btn-secondary\">' + lang.export_add_csv + '</button>');
                     var btnCsvUpdates = $('<button class=\"btn btn-warning\">' + lang.export_maj_csv + '</button>');
+                    var btnCsvHist = $('<button class=\"btn btn-info\">' + lang.export_hist_csv + '</button>');
                     
-                    btnContainer.append(btnFilter).append(btnCsvAll).append(btnCsvUpdates);
+                    btnContainer.append(btnFilter).append(btnCsvAll).append(btnCsvUpdates).append(btnCsvHist);
                     t.before(btnContainer);
 
                     btnFilter.on('click', function(e) {
@@ -157,6 +211,50 @@ class callbacks {
                         }
                         exportToCsv(filteredData, 'maj_plugins_additionnels');
                     });
+                    
+                    // CSV Historique complet (100% traduit)
+                    btnCsvHist.on('click', function(e) {
+                        e.preventDefault();
+                        
+                        // Utilisation de la traduction pour la console
+                        console.log(lang.console_click_export, hd ? hd.length : 0);
+                        
+                        if (!hd || hd.length === 0) {
+                            alert(lang.alert_empty_hist);
+                            return;
+                        }
+                        
+                        try {
+                            var BOM = '\\uFEFF';
+                            var csv = BOM + (lang.csv_plugin || 'Plugin') + ';' + 
+                                            (lang.version || 'Version') + ';' + 
+                                            (lang.updatedate || 'Date') + ';' + 
+                                            (lang.installedby || 'User') + ';' + 
+                                            (lang.email || 'Email') + '\\n';
+                            
+                            hd.forEach(function(row) {
+                                var cleanName    = (row.p || '').toString().replace(/;/g, ',');
+                                var cleanVersion = (row.v || '').toString().replace(/;/g, ',');
+                                var cleanUser    = (row.u || '').toString().replace(/;/g, ',');
+                                var cleanEmail   = (row.e || '').toString().replace(/;/g, ',');
+                                
+                                csv += '\"' + cleanName + '\";\"' + cleanVersion + '\";\"' + (row.d || '') + '\";\"' + cleanUser + '\";\"' + cleanEmail + '\"\\n';
+                            });
+                            
+                            var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                            var link = document.createElement('a');
+                            link.href = URL.createObjectURL(blob);
+                            link.download = 'historique_plugins_' + new Date().toISOString().slice(0,10) + '.csv';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            
+                        } catch (error) {
+                            // Utilisation des traductions pour les erreurs
+                            console.error(lang.error_csv_generation, error);
+                            alert(lang.alert_csv_error);
+                        }
+                    });
 
                     Templates.render('local_plugininstalltimer/columns', { isheader: true }).then(function(html) {
                         t.find('thead tr').append(html);
@@ -187,6 +285,7 @@ class callbacks {
                                 context.u = m.u;
                                 context.hasupdate = (m.up === 1);
                                 context.sortup = m.up;
+                                context.updatecount = m.uc;
                             } else { context.found = false; }
                             Templates.render('local_plugininstalltimer/columns', context).then(function(html) { r.append(html); });
                         }
@@ -202,6 +301,7 @@ class callbacks {
     private static function sync_plugins(): void {
         global $DB, $USER;
         $pluginman = \core_plugin_manager::instance();
+        
         foreach ($pluginman->get_plugins() as $type => $list) {
             foreach ($list as $name => $plugininfo) {
                 $comp = $type . '_' . $name;
@@ -210,8 +310,10 @@ class callbacks {
                 $ctime = ($path && file_exists($path)) ? filectime($path) : time();
                 $fdate = max($mtime, $ctime); 
                 $log_data = self::get_real_installer_data($comp);
+                
                 if ($rec = $DB->get_record('local_plugininstalltimer', ['pluginname' => $comp])) {
                     $updated = false;
+                    
                     if ($log_data && $log_data->time > $rec->timemodified) {
                         $rec->timemodified = $log_data->time;
                         $rec->userid = $log_data->userid;
@@ -222,15 +324,35 @@ class callbacks {
                         $rec->userid = ($fdate > (time() - 86400)) ? $USER->id : 0;
                         $updated = true;
                     }
+                    
                     if ($rec->userid == 0 && $log_data && $log_data->userid != 0) {
-                        $rec->userid = $log_data->userid; $updated = true;
+                        $rec->userid = $log_data->userid; 
+                        $updated = true;
                     }
-                    if ($updated) { $DB->update_record('local_plugininstalltimer', $rec); }
+                    
+                    if ($updated) { 
+                        $DB->update_record('local_plugininstalltimer', $rec);
+                        // --- AJOUT : Enregistrement dans l'historique ---
+                        $DB->insert_record('local_plugininstalltimer_hist', (object)[
+                            'pluginname' => $comp,
+                            'version' => $plugininfo->versiondb ?? 'unknown',
+                            'timemodified' => $rec->timemodified,
+                            'userid' => $rec->userid
+                        ]);
+                    }
                 } else {
                     $time = ($log_data) ? $log_data->time : $fdate;
                     $userid = ($log_data && $log_data->userid != 0) ? $log_data->userid : (($fdate > (time() - 86400)) ? $USER->id : 0);
                     $new = (object)['pluginname' => $comp, 'timeinstalled' => $time, 'timemodified' => $time, 'userid' => $userid];
                     $DB->insert_record('local_plugininstalltimer', $new);
+                    
+                    // --- AJOUT : Enregistrement dans l'historique (Installation initiale) ---
+                    $DB->insert_record('local_plugininstalltimer_hist', (object)[
+                        'pluginname' => $comp,
+                        'version' => $plugininfo->versiondb ?? 'unknown',
+                        'timemodified' => $time,
+                        'userid' => $userid
+                    ]);
                 }
             }
         }
